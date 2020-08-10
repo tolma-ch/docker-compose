@@ -1,14 +1,18 @@
-version: '3'
+version: '2.1'
 
 services:
   db:
     image: mysql:5.7
     command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci
     environment:
-      - MYSQL_DATABASE=tolmach
-      - MYSQL_USER=tolmach
-      - MYSQL_PASSWORD=yRqUxdGIOXikrnzlLcGl
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
       - MYSQL_RANDOM_ROOT_PASSWORD=yes
+    healthcheck:
+      test: "/etc/init.d/mysql status"
+      interval: 1s
+      retries: 120
     networks:
       - my-network-name
 
@@ -34,21 +38,51 @@ services:
       - ./volumes/media:/var/www/tolma.ch/media
     environment:
       - REDIS_HOST=redis
+      - MYSQL_HOST=db
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - SECRET_KEY=${SECRET_KEY}
+      - SPARKPOST_API_KEY=${SPARKPOST_API_KEY}
+      - DEBUG=${DEBUG}
+      - PROD=${PROD}
+      - PORT=${PORT}
+      - DOMAIN=${DOMAIN}
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     networks:
       - my-network-name
 
-  nginx:
-    build: ./nginx
+#  nginx:
+#    build: ./nginx
+#    volumes:
+#      - ./volumes/logs:/var/log/tolma.ch
+#      - ./volumes/static:/var/www/tolma.ch/static
+#      - ./volumes/media:/var/www/tolma.ch/media
+#    ports:
+#    - 80:80
+#    - 443:443
+#    depends_on:
+#      - app
+#    networks:
+#      - my-network-name
+
+  caddy:
+    image: caddy:2.1.1-alpine
     volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
       - ./volumes/logs:/var/log/tolma.ch
       - ./volumes/static:/var/www/tolma.ch/static
       - ./volumes/media:/var/www/tolma.ch/media
+    environment:
+      - PORT=${PORT}
+      - DOMAIN=${DOMAIN}
     ports:
-    - 80:80
-    - 443:443
+      - 80:80
+      - 443:443
     depends_on:
       - app
     networks:

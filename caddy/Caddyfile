@@ -1,0 +1,27 @@
+{$DOMAIN}:{$PORT}
+{
+  root * /var/www/tolma.ch
+
+  handle /media/avatar/* {
+    try_files {path} /static/img/default_avatar.png
+    file_server
+  }
+
+  handle /static/* {
+    file_server
+  }
+
+  handle /ws/* {
+    reverse_proxy /ws/* app:8000
+  }
+
+  handle /* {
+    reverse_proxy /* app:7000
+  }
+
+  redir /projects/ /projects/my/ 301
+
+  log {
+    level DEBUG
+  }
+}

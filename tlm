@@ -23,7 +23,7 @@ USAGE
 
 start()
 {
-  docker-compose up -d --build --remove-orphans
+  docker-compose up -d
 }
 
 rebuild()
@@ -42,11 +42,24 @@ run()
   docker-compose run --rm app "$@"
 }
 
+clean()
+{
+  docker rm "$(docker ps -q -f 'status=exited')"
+  docker rmi "$(docker images -q -f 'dangling=true')"
+}
+
+stats()
+{
+  docker stats --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}"
+}
+
 while [ -n "$1" ]
 do
   case "$1" in
     start) start ;;
     stop) stop ;;
+    clean) clean ;;
+    stats) stats ;;
     run) run "${@:2}" ;;
     rebuild) rebuild $2 ;;
     -h) usage
