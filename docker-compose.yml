@@ -3,7 +3,7 @@ version: '2.1'
 services:
   db:
     image: mysql:5.7
-    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci --max_allowed_packet=536870912 --wait_timeout=3600
     environment:
       - MYSQL_DATABASE=${MYSQL_DATABASE}
       - MYSQL_USER=${MYSQL_USER}
@@ -13,6 +13,8 @@ services:
       test: "/etc/init.d/mysql status"
       interval: 1s
       retries: 120
+    ports:
+      - 3306:3306
     networks:
       - my-network-name
 
@@ -37,6 +39,7 @@ services:
       - ./volumes/static:/var/www/tolma.ch/static
       - ./volumes/media:/var/www/tolma.ch/media
     environment:
+      - ES_HOST=elastic
       - REDIS_HOST=redis
       - MYSQL_HOST=db
       - MYSQL_DATABASE=${MYSQL_DATABASE}
