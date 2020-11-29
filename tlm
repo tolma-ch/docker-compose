@@ -8,17 +8,166 @@ usage()
 {
     cat << USAGE >&2
 Usage:
-    $CMD host:port [-s] [-t timeout] [-- command args]
-    -h HOST | --host=HOST       Host or IP under test
-    -p PORT | --port=PORT       TCP port under test
-                                Alternatively, you specify the host and port as host:port
-    -s | --strict               Only execute subcommand if the test succeeds
-    -q | --quiet                Don't output any status messages
-    -t TIMEOUT | --timeout=TIMEOUT
-                                Timeout in seconds, zero for no timeout
-    -- COMMAND ARGS             Execute command with args after the test finishes
+    $0 [command]
+    -h                                Show this message
+
+    init | init-stage | init-dev      Initialize Tolma.ch instance - generate .env and docker-compose.yml files,
+                                      authorize to docker registry
+    start                             Run Tolma.ch
+    stop                              Stop all the containers
+    exec                              Run arbitrary command on the "app" container
+    clean                             Remove all the unnecesary docker images and _containers_
+    stats                             Run docker top to show resource usage
 USAGE
     exit 1
+}
+
+init()
+{
+  case $1 in
+    "prod")
+      echo "prod"
+      grep -c "rg.fr-par.scw.cloud" ~/.docker/config.json 2>&1 >/dev/null || docker login -u nologin rg.fr-par.scw.cloud/tolmach-web
+      APP_CONTAINER_VERSION="1.0.5"
+      APP_CONTAINER_SOURCE="image: rg.fr-par.scw.cloud/tolmach-web/tolmach:$APP_CONTAINER_VERSION"
+      DEBUG="False"
+      PROD="True"
+      ;;
+
+    "dev")
+      echo "dev"
+      APP_CONTAINER_SOURCE="build: ../django"
+      DEBUG="True"
+      PROD="False"
+      CODE_VOLUME="- ../django:/var/www/tolma.ch"
+      ;;
+
+    "stage")
+      echo "stage"
+      grep -c "rg.fr-par.scw.cloud" ~/.docker/config.json 2>&1 >/dev/null || docker login -u nologin rg.fr-par.scw.cloud/tolmach-web
+      APP_CONTAINER_VERSION="1.0.4"
+      APP_CONTAINER_SOURCE="image: rg.fr-par.scw.cloud/tolmach-web/nologin/tolmach:$APP_CONTAINER_VERSION"
+      DEBUG="True"
+      PROD="False"
+      ;;
+  esac
+
+  ask_env()
+  {
+    read -p 'Domain name: ' DOMAIN
+    read -p 'Do you need HTTPS? [y/N]' IS_HTTPS
+    case "$IS_HTTPS" in
+      [yY]) PORT=443 ; return 0 ;;
+      [nN]) PORT=80 ; return 0 ;;
+      *) printf " \033[31m %s \n\033[0m" "invalid input" ; return 1
+    esac
+  }
+
+  ls test_env >/dev/null 2>&1 || ask_env && cat > test_env << ENV
+COMPOSE_PROJECT_NAME=tolmach
+
+DOMAIN=$DOMAIN
+PORT=$PORT
+SECRET_KEY="$(pwgen -sy 60 1)"
+DEBUG=$DEBUG
+PROD=$PROD
+
+MYSQL_DATABASE=tolmach
+MYSQL_USER=tolmach
+MYSQL_PASSWORD=$(pwgen -s 15 1)
+ENV
+
+  cat > test.yml << INIT
+version: '2.1'
+
+services:
+  db:
+    image: mysql:5.7
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci --max_allowed_packet=536870912 --wait_timeout=3600
+    environment:
+      - MYSQL_DATABASE=\${MYSQL_DATABASE}
+      - MYSQL_USER=\${MYSQL_USER}
+      - MYSQL_PASSWORD=\${MYSQL_PASSWORD}
+      - MYSQL_RANDOM_ROOT_PASSWORD=yes
+    healthcheck:
+      test: "/etc/init.d/mysql status"
+      interval: 1s
+      retries: 120
+    ports:
+      - 3306:3306
+    networks:
+      - my-network-name
+
+  elastic:
+    image: elasticsearch:2.4.6-alpine
+    depends_on:
+      - db
+    networks:
+      - my-network-name
+
+  redis:
+    image: redis
+    networks:
+      - my-network-name
+
+  app:
+    $APP_CONTAINER_SOURCE
+    volumes:
+      - ./volumes/logs:/var/log/tolma.ch
+      - ./volumes/docs:/var/www/tolmach_documents
+      - ./volumes/static:/var/www/tolma.ch/static
+      - ./volumes/media:/var/www/tolma.ch/media
+      $CODE_VOLUME
+    environment:
+      - ES_HOST=elastic
+      - REDIS_HOST=redis
+      - MYSQL_HOST=db
+      - MYSQL_DATABASE=\${MYSQL_DATABASE}
+      - MYSQL_USER=\${MYSQL_USER}
+      - MYSQL_PASSWORD=\${MYSQL_PASSWORD}
+      - SECRET_KEY=\${SECRET_KEY}
+      - SPARKPOST_API_KEY=\${SPARKPOST_API_KEY}
+      - DEBUG=\${DEBUG}
+      - PROD=\${PROD}
+      - PORT=\${PORT}
+      - DOMAIN=\${DOMAIN}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - my-network-name
+
+  caddy:
+    image: caddy:2.1.1-alpine
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - ./volumes/logs:/var/log/tolma.ch
+      - ./volumes/static:/var/www/tolma.ch/static
+      - ./volumes/media:/var/www/tolma.ch/media
+    environment:
+      - PORT=\${PORT}
+      - DOMAIN=\${DOMAIN}
+    ports:
+      - 80:80
+      - 443:443
+    depends_on:
+      - app
+    networks:
+      - my-network-name
+
+  lt:
+    image: silviof/docker-languagetool
+    networks:
+      - my-network-name
+
+networks:
+  my-network-name:
+    driver: bridge
+INIT
+
+
 }
 
 start()
@@ -28,7 +177,7 @@ start()
 
 rebuild()
 {
-  docker-compose up -d --build --force-recreate --remove-orphans $1
+  docker-compose up -d --build --force-recreate --remove-orphans "$1"
 }
 
 stop()
@@ -36,10 +185,10 @@ stop()
   docker-compose stop
 }
 
-run()
+exec()
 {
 #  echo "$@"
-  docker-compose run --rm app "$@"
+  docker-compose exec app "$@"
 }
 
 clean()
@@ -56,12 +205,15 @@ stats()
 while [ -n "$1" ]
 do
   case "$1" in
+    init) init prod ;;
+    init-dev) init dev ;;
+    init-stage) init stage ;;
     start) start ;;
     stop) stop ;;
     clean) clean ;;
     stats) stats ;;
-    run) run "${@:2}" ;;
-    rebuild) rebuild $2 ;;
+    exec) exec "${@:2}" ;;
+    rebuild) rebuild "$2" ;;
     -h) usage
     break ;;
   esac
