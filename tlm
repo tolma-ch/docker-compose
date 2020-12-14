@@ -28,7 +28,7 @@ init()
     "prod")
       echo "prod"
       grep -c "rg.fr-par.scw.cloud" ~/.docker/config.json 2>&1 >/dev/null || docker login -u nologin rg.fr-par.scw.cloud/tolmach-web
-      APP_CONTAINER_VERSION="1.0.5"
+      APP_CONTAINER_VERSION="1.1.20"
       APP_CONTAINER_SOURCE="image: rg.fr-par.scw.cloud/tolmach-web/tolmach:$APP_CONTAINER_VERSION"
       DEBUG="False"
       PROD="True"
@@ -45,7 +45,7 @@ init()
     "stage")
       echo "stage"
       grep -c "rg.fr-par.scw.cloud" ~/.docker/config.json 2>&1 >/dev/null || docker login -u nologin rg.fr-par.scw.cloud/tolmach-web
-      APP_CONTAINER_VERSION="1.0.4"
+      APP_CONTAINER_VERSION="1.1.20"
       APP_CONTAINER_SOURCE="image: rg.fr-par.scw.cloud/tolmach-web/nologin/tolmach:$APP_CONTAINER_VERSION"
       DEBUG="True"
       PROD="False"
@@ -185,6 +185,22 @@ stop()
   docker-compose stop
 }
 
+update()
+{
+  docker-compose pull app && \
+  docker-compose up -d && \
+  docker-compose exec app python manage.py collectstatic --noinput && \
+  docker-compose exec app python manage.py migrate
+}
+
+upgrade()
+{
+  docker-compose pull && \
+  docker-compose up -d && \
+  docker-compose exec app python manage.py collectstatic --noinput && \
+  docker-compose exec app python manage.py migrate
+}
+
 exec()
 {
 #  echo "$@"
@@ -212,6 +228,8 @@ do
     stop) stop ;;
     clean) clean ;;
     stats) stats ;;
+    update) update ;;
+    upgrade) upgrade ;;
     exec) exec "${@:2}" ;;
     rebuild) rebuild "$2" ;;
     -h) usage
