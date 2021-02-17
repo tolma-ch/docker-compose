@@ -7,6 +7,10 @@
     file_server
   }
 
+  handle /media/* {
+    file_server
+  }
+
   handle /static/* {
     file_server
   }
