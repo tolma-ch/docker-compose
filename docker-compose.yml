@@ -31,7 +31,10 @@ services:
       - my-network-name
 
   app:
-    build: ../django
+    build:
+      context: ../django
+      cache_from:
+        - registry.venya.tech/tolmach-web/tolmach:latest
     volumes:
       - ../django:/var/www/tolma.ch
       - ./volumes/logs:/var/log/tolma.ch

@@ -27,9 +27,9 @@ init()
   case $1 in
     "prod")
       echo "prod"
-      grep -c "rg.fr-par.scw.cloud" ~/.docker/config.json 2>&1 >/dev/null || docker login -u nologin rg.fr-par.scw.cloud/tolmach-web
+      grep -c "registry.venya.tech" ~/.docker/config.json 2>&1 >/dev/null || docker login -u tolmach registry.venya.tech/tolmach-web
       APP_CONTAINER_VERSION="1.1.20"
-      APP_CONTAINER_SOURCE="image: rg.fr-par.scw.cloud/tolmach-web/tolmach:$APP_CONTAINER_VERSION"
+      APP_CONTAINER_SOURCE="image: registry.venya.tech/tolmach-web/tolmach:$APP_CONTAINER_VERSION"
       DEBUG="False"
       PROD="True"
       ;;
@@ -44,9 +44,9 @@ init()
 
     "stage")
       echo "stage"
-      grep -c "rg.fr-par.scw.cloud" ~/.docker/config.json 2>&1 >/dev/null || docker login -u nologin rg.fr-par.scw.cloud/tolmach-web
+      grep -c "registry.venya.tech" ~/.docker/config.json 2>&1 >/dev/null || docker login -u tolmach registry.venya.tech/tolmach-web
       APP_CONTAINER_VERSION="1.1.20"
-      APP_CONTAINER_SOURCE="image: rg.fr-par.scw.cloud/tolmach-web/nologin/tolmach:$APP_CONTAINER_VERSION"
+      APP_CONTAINER_SOURCE="image: registry.venya.tech/tolmach-web/tolmach:$APP_CONTAINER_VERSION"
       DEBUG="True"
       PROD="False"
       ;;
