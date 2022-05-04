@@ -82,7 +82,7 @@ version: '2.1'
 
 services:
   db:
-    image: mysql:5.7
+    image: mariadb:10.4
     command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci --max_allowed_packet=536870912 --wait_timeout=3600
     environment:
       - MYSQL_DATABASE=\${MYSQL_DATABASE}
@@ -90,11 +90,11 @@ services:
       - MYSQL_PASSWORD=\${MYSQL_PASSWORD}
       - MYSQL_RANDOM_ROOT_PASSWORD=yes
     healthcheck:
-      test: "/etc/init.d/mysql status"
+      test: "/usr/local/bin/healthcheck.sh --connect"
       interval: 1s
       retries: 120
     ports:
-      - 3306:3306
+      - "127.0.0.1:3306:3306"
     networks:
       - my-network-name
 
